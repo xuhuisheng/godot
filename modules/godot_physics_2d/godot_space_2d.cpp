@@ -147,11 +147,20 @@ bool GodotPhysicsDirectSpaceState2D::intersect_ray(const RayParameters &p_parame
 
 		int shape_idx = space->intersection_query_subindex_results[i];
 		Transform2D inv_xform = col_obj->get_shape_inv_transform(shape_idx) * col_obj->get_inv_transform();
+		Transform2D col_obj_shape_xform = col_obj->get_transform() * col_obj->get_shape_transform(shape_idx);
 
 		Vector2 local_from = inv_xform.xform(begin);
 		Vector2 local_to = inv_xform.xform(end);
 
 		const GodotShape2D *shape = col_obj->get_shape(shape_idx);
+
+		if (col_obj->is_shape_set_as_one_way_collision(shape_idx)) {
+			Vector2 direction = col_obj_shape_xform.columns[1].normalized();
+
+			if (normal.dot(direction) <= CMP_EPSILON) {
+				continue;
+			}
+		}
 
 		Vector2 shape_point, shape_normal;
 
