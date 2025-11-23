@@ -752,15 +752,6 @@ bool GodotSpace2D::test_body_motion(GodotBody2D *p_body, const PhysicsServer2D::
 
 			GodotShape2D *body_shape = p_body->get_shape(body_shape_idx);
 
-			// Colliding separation rays allows to properly snap to the ground,
-			// otherwise it's not needed in regular motion.
-			if (!p_parameters.collide_separation_ray && (body_shape->get_type() == PhysicsServer2D::SHAPE_SEPARATION_RAY)) {
-				// When slide on slope is on, separation ray shape acts like a regular shape.
-				if (!static_cast<GodotSeparationRayShape2D *>(body_shape)->get_slide_on_slope()) {
-					continue;
-				}
-			}
-
 			Transform2D body_shape_xform = body_transform * p_body->get_shape_transform(body_shape_idx);
 
 			bool stuck = false;
