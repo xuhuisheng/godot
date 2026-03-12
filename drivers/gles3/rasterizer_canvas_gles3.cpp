@@ -1172,9 +1172,42 @@ void RasterizerCanvasGLES3::_record_item_commands(const Item *p_item, RID p_rend
 				}
 			} break;
 
-			case Item::Command::TYPE_MESH:
+			case Item::Command::TYPE_MESH: {
+				const Item::CommandMesh *mesh = static_cast<const Item::CommandMesh *>(c);
+				const Item::CommandMesh *current_command = static_cast<const Item::CommandMesh *>(state.canvas_instance_batches[state.current_batch_index].command);
+
+				if (current_command == nullptr || mesh->mesh != current_command->mesh || state.canvas_instance_batches[state.current_batch_index].command_type != Item::Command::TYPE_MESH || mesh->texture != state.canvas_instance_batches[state.current_batch_index].tex) {
+					_new_batch(r_batch_broken);
+					state.canvas_instance_batches[state.current_batch_index].specialization &= specialization_command_mask;
+					state.canvas_instance_batches[state.current_batch_index].specialization |= CanvasShaderGLES3::USE_ATTRIBUTES;
+					state.canvas_instance_batches[state.current_batch_index].specialization |= CanvasShaderGLES3::USE_INSTANCING;
+					state.canvas_instance_batches[state.current_batch_index].flags = 0;
+					state.canvas_instance_batches[state.current_batch_index].tex = mesh->texture;
+					state.canvas_instance_batches[state.current_batch_index].command = c;
+					state.canvas_instance_batches[state.current_batch_index].command_type = c->type;
+					_prepare_canvas_texture(state.canvas_instance_batches[state.current_batch_index].tex, state.canvas_instance_batches[state.current_batch_index].filter, state.canvas_instance_batches[state.current_batch_index].repeat, r_index, texpixel_size);
+				}
+
+				Color modulate(1, 1, 1, 1);
+				modulate = mesh->modulate;
+				_update_transform_2d_to_mat2x3(base_transform * draw_transform * mesh->transform, state.instance_data_array[r_index].world);
+
+				state.instance_data_array[r_index].modulation[0] = base_color.r * modulate.r;
+				state.instance_data_array[r_index].modulation[1] = base_color.g * modulate.g;
+				state.instance_data_array[r_index].modulation[2] = base_color.b * modulate.b;
+				state.instance_data_array[r_index].modulation[3] = base_color.a * modulate.a;
+
+				for (int j = 0; j < 4; j++) {
+					state.instance_data_array[r_index].src_rect[j] = 0;
+					state.instance_data_array[r_index].dst_rect[j] = 0;
+					state.instance_data_array[r_index].ninepatch_margins[j] = 0;
+				}
+				_add_to_batch(r_index, r_batch_broken);
+			} break;
+
 			case Item::Command::TYPE_MULTIMESH:
 			case Item::Command::TYPE_PARTICLES: {
+
 				// Meshes can't be batched, so always create a new batch.
 				_new_batch(r_batch_broken);
 
@@ -1182,13 +1215,7 @@ void RasterizerCanvasGLES3::_record_item_commands(const Item *p_item, RID p_rend
 				state.canvas_instance_batches[state.current_batch_index].specialization &= specialization_command_mask;
 				state.canvas_instance_batches[state.current_batch_index].specialization |= CanvasShaderGLES3::USE_ATTRIBUTES;
 				state.canvas_instance_batches[state.current_batch_index].flags = 0;
-				if (c->type == Item::Command::TYPE_MESH) {
-					const Item::CommandMesh *m = static_cast<const Item::CommandMesh *>(c);
-					state.canvas_instance_batches[state.current_batch_index].tex = m->texture;
-					_update_transform_2d_to_mat2x3(base_transform * draw_transform * m->transform, state.instance_data_array[r_index].world);
-					modulate = m->modulate;
-
-				} else if (c->type == Item::Command::TYPE_MULTIMESH) {
+				if (c->type == Item::Command::TYPE_MULTIMESH) {
 					const Item::CommandMultiMesh *mm = static_cast<const Item::CommandMultiMesh *>(c);
 					state.canvas_instance_batches[state.current_batch_index].tex = mm->texture;
 					state.canvas_instance_batches[state.current_batch_index].specialization |= CanvasShaderGLES3::USE_INSTANCING;
@@ -1398,6 +1425,13 @@ void RasterizerCanvasGLES3::_render_batch(Light *p_lights, uint32_t p_index, Ren
 				const Item::CommandMesh *m = static_cast<const Item::CommandMesh *>(state.canvas_instance_batches[p_index].command);
 				mesh = m->mesh;
 				mesh_instance = m->mesh_instance;
+				instance_count = state.canvas_instance_batches[p_index].instance_count;
+				instance_buffer = mesh_storage->multimesh_get_gl_buffer(multimesh);
+				instance_stride = mesh_storage->multimesh_get_stride(multimesh);
+				instance_color_offset = mesh_storage->multimesh_get_color_offset(multimesh);
+				instance_uses_color = mesh_storage->multimesh_uses_colors(multimesh);
+				instance_uses_custom_data = mesh_storage->multimesh_uses_custom_data(multimesh);
+				use_instancing = true;
 
 			} else if (state.canvas_instance_batches[p_index].command_type == Item::Command::TYPE_MULTIMESH) {
 				const Item::CommandMultiMesh *mm = static_cast<const Item::CommandMultiMesh *>(state.canvas_instance_batches[p_index].command);
