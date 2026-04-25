@@ -412,6 +412,10 @@ void AnimationNodeBlendSpace1DEditor::_update_space() {
 		return;
 	}
 
+	if (blend_space.is_null()) {
+		return;
+	}
+
 	updating = true;
 
 	max_value->set_value(blend_space->get_max_space());

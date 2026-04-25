@@ -432,8 +432,10 @@ AnimationNode::NodeTimeInfo AnimationNodeBlendSpace1D::_process(ProcessState &p_
 	if (blend_points_used == 1) {
 		// only one point available, just play that animation
 		pi.weight = 1.0;
-		AnimationNodeInstance &other_instance = p_instance.get_child_instance_by_path(get_blend_point_name(0));
-		return blend_node(p_process_state, p_instance, &other_instance, pi, FILTER_IGNORE, true, p_test_only);
+		AnimationNodeInstance *other_instance = p_instance.get_child_instance_by_path_or_null(get_blend_point_name(0));
+		if (other_instance) {
+			return blend_node(p_process_state, p_instance, other_instance, pi, FILTER_IGNORE, true, p_test_only);
+		}
 	}
 
 	double blend_pos = p_instance.get_parameter(blend_position);
@@ -514,9 +516,11 @@ AnimationNode::NodeTimeInfo AnimationNodeBlendSpace1D::_process(ProcessState &p_
 			for (int i = 0; i < blend_points_used; i++) {
 				AnimationMixer::PlaybackInfo test_pi = p_playback_info;
 				test_pi.weight = 0;
-				AnimationNodeInstance &other_instance = p_instance.get_child_instance_by_path(get_blend_point_name(i));
-				NodeTimeInfo info = blend_node(p_process_state, p_instance, &other_instance, test_pi, FILTER_IGNORE, true, true);
-				cached_lengths[i] = (info.length > CMP_EPSILON) ? info.length : 0.0;
+				AnimationNodeInstance *other_instance = p_instance.get_child_instance_by_path_or_null(get_blend_point_name(i));
+				if (other_instance) {					
+					NodeTimeInfo info = blend_node(p_process_state, p_instance, other_instance, test_pi, FILTER_IGNORE, true, true);
+					cached_lengths[i] = (info.length > CMP_EPSILON) ? info.length : 0.0;
+				}
 			}
 			lengths_dirty = false;
 		}
@@ -587,8 +591,12 @@ AnimationNode::NodeTimeInfo AnimationNodeBlendSpace1D::_process(ProcessState &p_
 		pi = p_playback_info;
 		pi.weight = weights[i];
 		pi.delta = deltas[i];
-		AnimationNodeInstance &other_instance = p_instance.get_child_instance_by_path(get_blend_point_name(i));
-		NodeTimeInfo t = blend_node(p_process_state, p_instance, &other_instance, pi, FILTER_IGNORE, true, p_test_only);
+		StringName blend_point_name = get_blend_point_name(i);
+		AnimationNodeInstance *other_instance = p_instance.get_child_instance_by_path_or_null(get_blend_point_name(i));
+		if (!other_instance) {
+			continue;
+		}
+		NodeTimeInfo t = blend_node(p_process_state, p_instance, other_instance, pi, FILTER_IGNORE, true, p_test_only);
 		if (i == new_closest) {
 			mind = t;
 		}
